@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Phishing URL Detector</title>
+<style>
+body { font-family: sans-serif; padding: 2rem; background: #f7f7f7; }
+h1 { color: #333; }
+input { width: 400px; padding: 0.5rem; margin-right: 0.5rem; }
+button { padding: 0.5rem 1rem; cursor: pointer; background: #007BFF; color: white; border: none; border-radius: 4px; }
+button:hover { background: #0056b3; }
+#result { margin-top: 1rem; font-weight: bold; background: white; padding: 1rem; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);}
+</style>
+</head>
+<body>
+<h1>Phishing URL Detector</h1>
+<input type="text" id="urlInput" placeholder="Вставьте URL">
+<button onclick="checkURL()">Проверить</button>
+<div id="result">URL: не определен<br>Прогноз: не определен<br>Доверенность: NaN%</div>
+
+<script>
+async function checkURL() {
+    const url = document.getElementById("urlInput").value;
+    if (!url) return alert("Введите URL!");
+    
+    try {
+        const response = await fetch("/predict", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url })
+        });
+        const data = await response.json();
+
+        document.getElementById("result").innerHTML = `
+            URL: ${data.url}<br>
+            Прогноз: <strong>${data.prediction}</strong><br>
+            Доверенность: ${
+                isNaN(data.confidence) 
+                ? "NaN%" 
+                : (data.confidence*100).toFixed(2) + "%"
+            }
+        `;
+    } catch(err) {
+        document.getElementById("result").innerHTML = "Ошибка при запросе к API";
+        console.error(err);
+    }
+}
+</script>
+</body>
+</html>
