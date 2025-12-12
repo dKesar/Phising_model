@@ -2,47 +2,172 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Phishing URL Detector</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🛡️ Phishing URL Detector</title>
 <style>
-body { font-family: sans-serif; padding: 2rem; background: #f7f7f7; }
-h1 { color: #333; }
-input { width: 400px; padding: 0.5rem; margin-right: 0.5rem; }
-button { padding: 0.5rem 1rem; cursor: pointer; background: #007BFF; color: white; border: none; border-radius: 4px; }
-button:hover { background: #0056b3; }
-#result { margin-top: 1rem; font-weight: bold; background: white; padding: 1rem; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);}
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    margin: 0;
+    padding: 2rem;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e4edf5 100%);
+    min-height: 100vh;
+}
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+h1 {
+    color: #2c3e50;
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+.input-group {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+input {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+}
+button {
+    padding: 0.75rem 1.5rem;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+button:hover {
+    background: #2980b9;
+}
+button:disabled {
+    background: #bdc3c7;
+    cursor: not-allowed;
+}
+#result {
+    background: white;
+    border-radius: 10px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transition: all 0.3s;
+    min-height: 60px;
+}
+.result-phishing {
+    border-left: 6px solid #e74c3c;
+    background: #fdf2f2;
+}
+.result-legitimate {
+    border-left: 6px solid #27ae60;
+    background: #f2fdf5;
+}
+.result-error {
+    border-left: 6px solid #f39c12;
+    background: #fef9e7;
+}
+.loading {
+    opacity: 0.6;
+}
+.hidden {
+    display: none;
+}
 </style>
 </head>
 <body>
-<h1>Phishing URL Detector</h1>
-<input type="text" id="urlInput" placeholder="Вставьте URL">
-<button onclick="checkURL()">Проверить</button>
-<div id="result">URL: не определен<br>Прогноз: не определен<br>Доверенность: NaN%</div>
+<div class="container">
+    <h1>🛡️ Phishing URL Detector</h1>
+    <div class="input-group">
+        <input type="text" id="urlInput" placeholder="Введите URL (например: https://google.com)">
+        <button id="checkBtn" onclick="checkURL()">Проверить</button>
+    </div>
+    <div id="result" class="hidden">
+        <div id="resultText"></div>
+    </div>
+</div>
 
 <script>
+const input = document.getElementById("urlInput");
+const btn = document.getElementById("checkBtn");
+const resultDiv = document.getElementById("result");
+const resultText = document.getElementById("resultText");
+
+// Поддержка Enter
+input.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") checkURL();
+});
+
 async function checkURL() {
-    const url = document.getElementById("urlInput").value;
-    if (!url) return alert("Введите URL!");
-    
+    const url = input.value.trim();
+    if (!url) {
+        alert("Пожалуйста, введите URL.");
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Проверка...";
+    resultDiv.className = "loading";
+
     try {
         const response = await fetch("/predict", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ url })
         });
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
         const data = await response.json();
 
-        document.getElementById("result").innerHTML = `
-            URL: ${data.url}<br>
-            Прогноз: <strong>${data.prediction}</strong><br>
-            Доверенность: ${
-                isNaN(data.confidence) 
-                ? "NaN%" 
-                : (data.confidence*100).toFixed(2) + "%"
-            }
+        let cls = "result-error";
+        let color = "#f39c12";
+        let icon = "⚠️";
+
+        if (data.prediction === "phishing") {
+            cls = "result-phishing";
+            color = "#e74c3c";
+            icon = "🔴";
+        } else if (data.prediction === "legitimate") {
+            cls = "result-legitimate";
+            color = "#27ae60";
+            icon = "🟢";
+        }
+
+        resultText.innerHTML = `
+            <strong>URL:</strong> ${data.url}<br><br>
+            <strong>Результат:</strong> 
+            <span style="color: ${color}; font-weight: bold;">
+                ${icon} ${data.prediction}
+            </span><br><br>
+            <strong>Уверенность:</strong> ${(data.confidence * 100).toFixed(2)}%
         `;
-    } catch(err) {
-        document.getElementById("result").innerHTML = "Ошибка при запросе к API";
+
+        if (data.error) {
+            resultText.innerHTML += `<br><br><strong>Ошибка:</strong> ${data.error}`;
+        }
+
+        resultDiv.className = cls;
+        resultDiv.classList.remove("hidden");
+
+    } catch (err) {
         console.error(err);
+        resultText.innerHTML = `❌ Ошибка: ${err.message || "Не удалось подключиться к серверу"}`;
+        resultDiv.className = "result-error";
+        resultDiv.classList.remove("hidden");
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "Проверить";
     }
 }
 </script>
